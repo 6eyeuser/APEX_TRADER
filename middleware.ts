@@ -1,43 +1,17 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { withAuth } from "next-auth/middleware";
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  const pathname = request.nextUrl.pathname;
+// This explicitly tells NextAuth to secure these routes using your JWT strategy
+export default withAuth({
+  pages: {
+    signIn: "/login",
+  },
+});
 
-  // Logged-in users should not see login/signup
-  if (
-    token &&
-    (pathname === "/login" || pathname === "/signup")
-  ) {
-    return NextResponse.redirect(
-      new URL("/terminal", request.url)
-    );
-  }
-
-  // Unauthenticated users cannot access protected pages
-  if (
-    !token &&
-    (
-      pathname.startsWith("/terminal") ||
-      pathname.startsWith("/dashboard") ||
-      pathname.startsWith("/admin")
-    )
-  ) {
-    return NextResponse.redirect(
-      new URL("/login", request.url)
-    );
-  }
-
-  return NextResponse.next();
-}
-
+// Add every route you want protected to this array
 export const config = {
   matcher: [
-    "/login",
-    "/signup",
     "/terminal/:path*",
     "/dashboard/:path*",
-    "/admin/:path*",
+    "/trade/:path*",
   ],
 };
