@@ -73,8 +73,12 @@ export const authOptions: NextAuthOptions = {
 
         user.apexToken = apexToken;
 
-        console.log("Google login successful:", email);
+        console.log("---------------------------------");
+        console.log("GOOGLE LOGIN SUCCESS");
+        console.log("Email:", email);
         console.log("ApexTrader user ID:", dbUser.id);
+        console.log("ApexTrader JWT generated");
+        console.log("---------------------------------");
 
         return true;
       } catch (error) {
@@ -84,6 +88,10 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user }) {
+      if (user?.id) {
+        token.userId = user.id;
+      }
+
       if (user?.apexToken) {
         token.apexToken = user.apexToken;
       }
@@ -92,15 +100,17 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      if (session.user && token.apexToken) {
-        session.user.apexToken = token.apexToken;
+      if (session.user) {
+        if (token.userId) {
+          session.user.id = String(token.userId);
+        }
+
+        if (token.apexToken) {
+          session.user.apexToken = String(token.apexToken);
+        }
       }
 
       return session;
-    },
-
-    async redirect({ baseUrl }) {
-      return `${baseUrl}/api/auth/google-complete`;
     },
   },
 

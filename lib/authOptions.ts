@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
@@ -11,32 +11,40 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
+  session: {
+    strategy: "jwt",
+  },
+
+  secret: process.env.NEXTAUTH_SECRET,
+
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider !== "google") {
         return false;
       }
 
-      try {
-        if (!user.email) {
-          console.error("Google did not provide an email");
-          return false;
-        }
+      if (!user.email) {
+        console.error("Google did not provide an email.");
+        return false;
+      }
 
+      try {
         const email = user.email.toLowerCase().trim();
 
+        // Find existing ApexTrader user
         let dbUser = await prisma.user.findUnique({
           where: {
             email,
           },
         });
 
+        // Create ApexTrader user if they don't exist
         if (!dbUser) {
           dbUser = await prisma.user.create({
             data: {
               name: user.name || "Google Trader",
               email,
-              password: "oauth_dummy_" + crypto.randomUUID(),
+              password: `oauth_${crypto.randomUUID()}`,
               balance: 100000,
             },
           });
@@ -44,10 +52,11 @@ export const authOptions: NextAuthOptions = {
           console.log("Created Google user:", email);
         }
 
+        // Create ApexTrader JWT
         const jwtSecret = process.env.JWT_SECRET;
 
         if (!jwtSecret) {
-          console.error("JWT_SECRET is missing");
+          console.error("JWT_SECRET is missing.");
           return false;
         }
 
@@ -65,15 +74,15 @@ export const authOptions: NextAuthOptions = {
           .setExpirationTime("7d")
           .sign(secret);
 
-        // Pass the ApexTrader JWT into NextAuth
+        // Store ApexTrader JWT temporarily in NextAuth user
         user.apexToken = apexToken;
 
-        console.log("=================================");
+        console.log("---------------------------------");
         console.log("GOOGLE LOGIN SUCCESS");
         console.log("Email:", email);
-        console.log("Database ID:", dbUser.id);
-        console.log("Apex token generated");
-        console.log("=================================");
+        console.log("ApexTrader user ID:", dbUser.id);
+        console.log("ApexTrader JWT generated");
+        console.log("---------------------------------");
 
         return true;
       } catch (error) {
@@ -83,10 +92,12 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user }) {
+      // Save ApexTrader user ID
       if (user?.id) {
         token.userId = user.id;
       }
 
+      // Save ApexTrader JWT
       if (user?.apexToken) {
         token.apexToken = user.apexToken;
       }
@@ -96,10 +107,12 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session.user) {
+        // ApexTrader database user ID
         if (token.userId) {
           session.user.id = String(token.userId);
         }
 
+        // ApexTrader JWT
         if (token.apexToken) {
           session.user.apexToken = String(token.apexToken);
         }
@@ -107,21 +120,11 @@ export const authOptions: NextAuthOptions = {
 
       return session;
     },
-
-    async redirect({ baseUrl }) {
-      return `${baseUrl}/api/auth/google-complete`;
-    },
   },
 
   pages: {
     signIn: "/login",
   },
-
-  session: {
-    strategy: "jwt",
-  },
-
-  secret: process.env.NEXTAUTH_SECRET,
 
   debug: process.env.NODE_ENV === "development",
 };
