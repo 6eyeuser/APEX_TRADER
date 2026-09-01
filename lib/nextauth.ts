@@ -6,8 +6,8 @@ import * as jose from "jose";
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
 
@@ -28,71 +28,38 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (!user.email) {
-        console.error("GOOGLE AUTH ERROR: No email returned");
+        console.error("Google did not provide an email.");
         return false;
       }
 
       try {
         const email = user.email.toLowerCase().trim();
 
-        console.log("GOOGLE AUTH: Looking up user:", email);
-
-        /*
-         * IMPORTANT:
-         * Use findFirst instead of findUnique.
-         *
-         * This works even if your Prisma schema currently
-         * does not have @unique on User.email.
-         */
-        let dbUser = await prisma.user.findFirst({
+        const dbUser = await prisma.user.upsert({
           where: {
             email,
           },
+
+          update: {
+            name: user.name || undefined,
+          },
+
+          create: {
+            name: user.name || "Google Trader",
+            email,
+            password: `oauth_${crypto.randomUUID()}`,
+            balance: 100000,
+          },
         });
 
-        console.log(
-          "GOOGLE AUTH: Existing user:",
-          dbUser ? dbUser.id : "NONE"
-        );
-
-        /*
-         * Create the user if they don't exist.
-         */
-        if (!dbUser) {
-          dbUser = await prisma.user.create({
-            data: {
-              name: user.name || "Google Trader",
-              email,
-              password: `oauth_${crypto.randomUUID()}`,
-              balance: 100000,
-            },
-          });
-
-          console.log(
-            "GOOGLE AUTH: Created database user:",
-            dbUser.id
-          );
-        }
-
-        /*
-         * Make sure JWT_SECRET exists.
-         */
         const jwtSecret = process.env.JWT_SECRET;
 
         if (!jwtSecret) {
-          console.error(
-            "GOOGLE AUTH ERROR: JWT_SECRET is missing"
-          );
-          return false;
+          throw new Error("JWT_SECRET is not configured.");
         }
 
-        /*
-         * Generate ApexTrader's own JWT.
-         */
-        const secret = new TextEncoder().encode(jwtSecret);
-
         const apexToken = await new jose.SignJWT({
-          userId: String(dbUser.id),
+          userId: dbUser.id,
           email: dbUser.email,
           name: dbUser.name,
         })
@@ -101,43 +68,24 @@ export const authOptions: NextAuthOptions = {
           })
           .setIssuedAt()
           .setExpirationTime("7d")
-          .sign(secret);
+          .sign(new TextEncoder().encode(jwtSecret));
 
-        /*
-         * IMPORTANT:
-         * Override NextAuth's user.id with YOUR database ID.
-         *
-         * Otherwise user.id can remain Google's ID.
-         */
-        user.id = String(dbUser.id);
-
-        /*
-         * Store ApexTrader JWT on the NextAuth user.
-         */
+        user.id = dbUser.id;
         user.apexToken = apexToken;
 
-        console.log("--------------------------------");
-        console.log("GOOGLE LOGIN SUCCESS");
-        console.log("Email:", dbUser.email);
-        console.log("Database ID:", dbUser.id);
-        console.log("Apex JWT generated");
-        console.log("--------------------------------");
+        console.log("Google authentication successful");
+        console.log("ApexTrader user:", dbUser.id);
 
         return true;
       } catch (error) {
-        console.error("--------------------------------");
-        console.error("GOOGLE LOGIN / PRISMA ERROR");
+        console.error("Google authentication failed:");
         console.error(error);
-        console.error("--------------------------------");
 
         return false;
       }
     },
 
     async jwt({ token, user }) {
-      /*
-       * First login.
-       */
       if (user) {
         if (user.id) {
           token.userId = String(user.id);
@@ -166,5 +114,5 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  debug: true,
+  debug: process.env.NODE_ENV === "development",
 };

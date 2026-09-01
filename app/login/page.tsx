@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Loader2,
@@ -14,6 +15,17 @@ import Magnetic from "@/components/ui/Magnetic";
 export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 1. Add session and router hooks
+  const { status } = useSession();
+  const router = useRouter();
+
+  // 2. Automatically redirect if already logged in (cookie exists)
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/terminal");
+    }
+  }, [status, router]);
 
   const handleGoogleLogin = async () => {
     setError("");
@@ -33,6 +45,15 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  // If loading session state, optionally show a blank screen or spinner to prevent flicker
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-screen w-full bg-[#0B0E14] items-center justify-center">
+        <Loader2 size={32} className="text-[#2962FF] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-[#0B0E14] text-white font-sans overflow-hidden">
