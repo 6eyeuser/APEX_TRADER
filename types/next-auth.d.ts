@@ -1,16 +1,17 @@
-import { DefaultSession } from "next-auth";
+import "next-auth";
+import "next-auth/jwt";
 
 declare module "next-auth" {
+  interface User {
+    id?: string;
+    apexToken?: string;
+  }
+
   interface Session {
     user: {
       id: string;
-      apexToken: string;
+      apexToken?: string;
     } & DefaultSession["user"];
-  }
-
-  interface User {
-    id: string;
-    apexToken?: string;
   }
 }
 

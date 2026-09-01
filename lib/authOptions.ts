@@ -19,27 +19,44 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account }) {
+      console.log("=================================");
+      console.log("GOOGLE SIGN-IN START");
+      console.log("Provider:", account?.provider);
+      console.log("Email:", user.email);
+      console.log("=================================");
+
+      // Only allow Google
       if (account?.provider !== "google") {
+        console.error("Google sign-in rejected: invalid provider");
         return false;
       }
 
+      // Google must provide an email
       if (!user.email) {
-        console.error("Google did not provide an email.");
+        console.error("Google sign-in rejected: no email");
         return false;
       }
 
       try {
         const email = user.email.toLowerCase().trim();
 
-        // Find existing ApexTrader user
+        // -----------------------------------------
+        // FIND USER
+        // -----------------------------------------
+
         let dbUser = await prisma.user.findUnique({
           where: {
             email,
           },
         });
 
-        // Create ApexTrader user if they don't exist
+        // -----------------------------------------
+        // CREATE USER IF NOT FOUND
+        // -----------------------------------------
+
         if (!dbUser) {
+          console.log("User not found. Creating new user...");
+
           dbUser = await prisma.user.create({
             data: {
               name: user.name || "Google Trader",
@@ -49,21 +66,31 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          console.log("Created Google user:", email);
+          console.log("Created Google user:", dbUser.id);
+        } else {
+          console.log("Existing user:", dbUser.id);
         }
 
-        // Create ApexTrader JWT
+        // -----------------------------------------
+        // JWT SECRET
+        // -----------------------------------------
+
         const jwtSecret = process.env.JWT_SECRET;
 
         if (!jwtSecret) {
-          console.error("JWT_SECRET is missing.");
-          return false;
+          throw new Error(
+            "JWT_SECRET is missing from environment variables"
+          );
         }
+
+        // -----------------------------------------
+        // CREATE APEXTRADER JWT
+        // -----------------------------------------
 
         const secret = new TextEncoder().encode(jwtSecret);
 
         const apexToken = await new jose.SignJWT({
-          userId: dbUser.id,
+          userId: String(dbUser.id),
           email: dbUser.email,
           name: dbUser.name,
         })
@@ -74,30 +101,38 @@ export const authOptions: NextAuthOptions = {
           .setExpirationTime("7d")
           .sign(secret);
 
-        // Store ApexTrader JWT temporarily in NextAuth user
+        // Store ApexTrader token on NextAuth user
         user.apexToken = apexToken;
 
-        console.log("---------------------------------");
+        console.log("=================================");
         console.log("GOOGLE LOGIN SUCCESS");
         console.log("Email:", email);
-        console.log("ApexTrader user ID:", dbUser.id);
-        console.log("ApexTrader JWT generated");
-        console.log("---------------------------------");
+        console.log("Database ID:", dbUser.id);
+        console.log("APEX JWT CREATED");
+        console.log("=================================");
 
         return true;
       } catch (error) {
-        console.error("Google sign-in error:", error);
-        return false;
+        console.error("=================================");
+        console.error("GOOGLE SIGN-IN FAILED");
+        console.error(error);
+        console.error("=================================");
+
+        // DO NOT silently convert the real error
+        // into a useless AccessDenied message.
+        throw error;
       }
     },
 
+    // -----------------------------------------
+    // NEXTAUTH JWT
+    // -----------------------------------------
+
     async jwt({ token, user }) {
-      // Save ApexTrader user ID
       if (user?.id) {
-        token.userId = user.id;
+        token.userId = String(user.id);
       }
 
-      // Save ApexTrader JWT
       if (user?.apexToken) {
         token.apexToken = user.apexToken;
       }
@@ -105,14 +140,16 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
+    // -----------------------------------------
+    // NEXTAUTH SESSION
+    // -----------------------------------------
+
     async session({ session, token }) {
       if (session.user) {
-        // ApexTrader database user ID
         if (token.userId) {
           session.user.id = String(token.userId);
         }
 
-        // ApexTrader JWT
         if (token.apexToken) {
           session.user.apexToken = String(token.apexToken);
         }
@@ -126,5 +163,5 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
 
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
 };
