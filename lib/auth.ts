@@ -17,9 +17,14 @@ export async function getSession(): Promise<AuthSession | null> {
       return null;
     }
 
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET || "apex_trader_super_secret_key_2026"
-    );
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      console.error("JWT_SECRET is missing.");
+      return null;
+    }
+
+    const secret = new TextEncoder().encode(jwtSecret);
 
     const { payload } = await jwtVerify(token, secret);
 

@@ -1,4 +1,4 @@
-
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
@@ -12,13 +12,11 @@ export async function GET() {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
     const { payload } = await jose.jwtVerify(token, secret);
 
-    
     const requestingUser = await prisma.user.findUnique({ where: { id: payload.userId as string } });
     if (!requestingUser || requestingUser.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
     }
 
-    
     const users = await prisma.user.findMany({
       select: {
         id: true,
