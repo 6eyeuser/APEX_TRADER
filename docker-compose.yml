@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+  # Using the official PostgreSQL image
+    image: postgres:15-alpine
+    container_name: apex_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: apextrader
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+  # Added Redis for Pub/Sub Market Data
+    image: redis:7-alpine
+    container_name: apex_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

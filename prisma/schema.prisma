@@ -1,0 +1,159 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LOSS
+  TAKE_PROFIT
+}
+
+enum OrderStatus {
+  PENDING
+  FILLED
+  CANCELLED
+  REJECTED
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+model User {
+  id               String       @id @default(cuid())
+  name             String
+  email            String       @unique
+  password         String?      // Stores the securely hashed password
+  role             String       @default("USER") // "USER" or "ADMIN"
+  balance          Float        @default(100000.00) 
+  
+  // --- High-Water Mark Tracking ---
+  peakBalance      Float        @default(100000.00)
+  peakBalanceAt    DateTime     @default(now())
+  
+  // --- Telegram Integration ---
+  telegramChatId   String?      @unique
+  telegramLinkCode String?      @unique
+  
+  positions        Position[]
+  trades           Trade[]      // Links the user to their trade history ledger
+  orders           Order[]      // Links the user to their pending and historical orders
+  ledgerLines      LedgerLine[] // Links the user to their double-entry accounting lines
+  wallets          UserWallet[] // Links the user to their connected Web3 wallets
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model UserWallet {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address    String
+  chainId    Int      @default(1)
+  chainName  String   @default("Ethereum")
+  symbol     String   @default("ETH")
+  balance    Float    @default(0.0)
+  label      String?
+  lastSynced DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, address, chainId])
+  @@index([userId])
+}
+
+model Position {
+  id           String   @id @default(cuid())
+  symbol       String
+  shares       Float
+  averagePrice Float
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ensures a user can only have one active position record per symbol
+  @@unique([userId, symbol]) 
+}
+
+// The permanent ledger for every transaction
+model Trade {
+  id        String   @id @default(cuid())
+  action    String   // "BUY" or "SELL"
+  symbol    String
+  shares    Float
+  price     Float
+  total     Float    // Total value of the trade execution
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now()) // Exactly when the trade happened
+}
+
+// Asynchronous order book for Limit, Stop-Loss, and Take-Profit orders
+model Order {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol        String
+  side          OrderSide   // BUY or SELL
+  type          OrderType   // MARKET, LIMIT, STOP_LOSS, TAKE_PROFIT
+  status        OrderStatus @default(PENDING) // PENDING, FILLED, CANCELLED, REJECTED
+  shares        Float
+  targetPrice   Float       // Target price triggering execution
+  executedPrice Float?      // Actual fill price
+  totalCost     Float?      // Total cost of execution
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status, symbol])
+  @@index([userId])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  code      String
+  expiresAt DateTime
+}
+
+// ==========================================
+// DOUBLE-ENTRY LEDGER SYSTEM
+// ==========================================
+
+// Represents a single financial event (e.g., "TRADE", "DEPOSIT", "ORDER_ESCROW")
+model JournalEntry {
+  id          String       @id @default(cuid())
+  type        String       // e.g., "TRADE", "DEPOSIT", "ORDER_ESCROW", "ESCROW_REFUND"
+  referenceId String?      // The Order ID or Trade ID this relates to
+  description String?
+  lines       LedgerLine[]
+  createdAt   DateTime     @default(now())
+}
+
+// The immutable debit/credit lines that must balance to exactly zero
+model LedgerLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  
+  userId         String?      // Null if it's the System/Broker's account
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  accountId      String       // "USER_CASH", "USER_ESCROW", "SYSTEM_CLEARING"
+  direction      String       // "DEBIT" or "CREDIT"
+  amount         Float
+
+  createdAt      DateTime     @default(now())
+
+  @@index([userId, accountId])
+}
