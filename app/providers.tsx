@@ -1,0 +1,13 @@
+"use client";
+
+import { SessionProvider } from "next-auth/react";
+import React from "react";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      {/* If you are fixing the Web3 403 error, comment out your Web3Modal here for now */}
+      {children}
+    </SessionProvider>
+  );
+}
