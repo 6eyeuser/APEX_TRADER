@@ -32,7 +32,7 @@ export default function TerminalPage() {
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [orderQuantity, setOrderQuantity] = useState<number | string>(1);
   
-  // NEW: Chart Type State
+  // Chart Type State
   const [chartType, setChartType] = useState<'candle' | 'line' | 'area'>('candle');
 
   const activeSymbol = useTradingStore((state) => state.activeSymbol);
@@ -93,9 +93,13 @@ export default function TerminalPage() {
 
   // Auth & Initial Data Fetching
   useEffect(() => {
-    const token = Cookies.get("token");
+    // CRITICAL FIX: Check for both custom token AND NextAuth Google session cookies
+    const hasCustomToken = Cookies.get("token");
+    const hasNextAuthToken = Cookies.get("next-auth.session-token");
+    const hasSecureNextAuthToken = Cookies.get("__Secure-next-auth.session-token");
     
-    if (!token) {
+    // If NO tokens exist, kick to login
+    if (!hasCustomToken && !hasNextAuthToken && !hasSecureNextAuthToken) {
       router.push("/");
       return;
     }
@@ -137,7 +141,6 @@ export default function TerminalPage() {
       initializeMarketData();
     }
 
-    // Click outside handler for dropdown
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
@@ -217,7 +220,6 @@ export default function TerminalPage() {
           alert(`Trade Failed: ${data.error || 'Unknown error'}`);
         }
       } else {
-        // Limit or Stop Order Submission
         const price = Number(targetPrice) || currentPrice;
         const res = await fetch('/api/auth/orders', {
           method: 'POST',
@@ -237,7 +239,7 @@ export default function TerminalPage() {
           alert(`${orderType} order placed successfully! Cash/Shares secured in escrow.`);
           setOrderQuantity(1);
           setTargetPrice("");
-          fetchOrders(); // Refresh pending orders list
+          fetchOrders();
         } else {
           alert(`Order Error: ${data.error}`);
         }
@@ -366,7 +368,10 @@ export default function TerminalPage() {
 
                 <button
                   onClick={() => {
+                    // Sign out needs to clear BOTH tokens now
                     Cookies.remove("token", { path: "/" });
+                    Cookies.remove("next-auth.session-token", { path: "/" });
+                    Cookies.remove("__Secure-next-auth.session-token", { path: "/" });
                     router.push("/");
                   }}
                   className="w-full px-4 py-2.5 text-left text-sm text-[#FF3B30] hover:bg-[#FF3B30]/10 flex items-center gap-3 transition"

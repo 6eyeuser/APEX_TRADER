@@ -1,20 +1,33 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
-import { cookies } from "next/headers";
+import { getToken } from "next-auth/jwt";
 import { recordJournalEntry } from "@/lib/ledger";
 
-async function getUserId() {
-  const token = cookies().get("token")?.value;
-  if (!token) return null;
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
-  const { payload } = await jose.jwtVerify(token, secret);
-  return payload.userId as string;
+// The Ultimate Dual-Auth Checker
+async function getUserId(req: NextRequest) {
+  // 1. Try Google Login (NextAuth)
+  const nextAuthToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (nextAuthToken?.userId) return nextAuthToken.userId as string;
+
+  // 2. Try Normal Login (Custom Token)
+  const token = req.cookies.get("token")?.value;
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
+      const { payload } = await jose.jwtVerify(token, secret);
+      return payload.userId as string;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  return null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(req);
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
     const orders = await prisma.order.findMany({
@@ -29,13 +42,12 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(req);
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
     const { symbol, side, type, shares, targetPrice } = await req.json();
-
     const parsedShares = Number(shares);
     const parsedTarget = Number(targetPrice);
 
@@ -57,7 +69,6 @@ export async function POST(req: Request) {
           throw new Error(`Insufficient purchasing power. Required collateral: $${requiredCash.toFixed(2)}`);
         }
 
-        // Double-Entry Ledger: Escrow Lock
         await recordJournalEntry(tx, {
           type: "ORDER_ESCROW",
           description: `Escrow lock for BUY ${parsedShares} ${symbol}`,
@@ -78,15 +89,7 @@ export async function POST(req: Request) {
       }
 
       return await tx.order.create({
-        data: {
-          userId,
-          symbol,
-          side,
-          type,
-          shares: parsedShares,
-          targetPrice: parsedTarget,
-          status: "PENDING"
-        }
+        data: { userId, symbol, side, type, shares: parsedShares, targetPrice: parsedTarget, status: "PENDING" }
       });
     });
 
@@ -96,12 +99,12 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(req);
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = req.nextUrl;
     const orderId = searchParams.get("id");
 
     if (!orderId) return NextResponse.json({ error: "Order ID required" }, { status: 400 });
@@ -117,8 +120,6 @@ export async function DELETE(req: Request) {
 
       if (order.side === "BUY") {
         const refundAmount = order.shares * order.targetPrice;
-        
-        // Double-Entry Ledger: Escrow Refund
         await recordJournalEntry(tx, {
           type: "ESCROW_REFUND",
           referenceId: order.id,
@@ -140,12 +141,7 @@ export async function DELETE(req: Request) {
           });
         } else {
           await tx.position.create({
-            data: {
-              userId,
-              symbol: order.symbol,
-              shares: order.shares,
-              averagePrice: order.targetPrice
-            }
+            data: { userId, symbol: order.symbol, shares: order.shares, averagePrice: order.targetPrice }
           });
         }
       }
