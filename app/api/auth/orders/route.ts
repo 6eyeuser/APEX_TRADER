@@ -1,17 +1,22 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
-import { getToken } from "next-auth/jwt";
+import { cookies } from "next/headers";
 import { recordJournalEntry } from "@/lib/ledger";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/nextauth";
 
-// The Ultimate Dual-Auth Checker
-async function getUserId(req: NextRequest) {
-  // 1. Try Google Login (NextAuth)
-  const nextAuthToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (nextAuthToken?.userId) return nextAuthToken.userId as string;
+// Bulletproof Dual-Auth Checker
+async function getUserId() {
+  // 1. NextAuth (Google) - Bypasses cookie headers entirely
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (dbUser) return String(dbUser.id);
+  }
 
-  // 2. Try Normal Login (Custom Token)
-  const token = req.cookies.get("token")?.value;
+  // 2. Legacy Custom Token
+  const token = cookies().get("token")?.value;
   if (token) {
     try {
       const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
@@ -21,13 +26,12 @@ async function getUserId(req: NextRequest) {
       return null;
     }
   }
-
   return null;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const userId = await getUserId(req);
+    const userId = await getUserId();
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
     const orders = await prisma.order.findMany({
@@ -42,12 +46,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const userId = await getUserId(req);
+    const userId = await getUserId();
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
     const { symbol, side, type, shares, targetPrice } = await req.json();
+
     const parsedShares = Number(shares);
     const parsedTarget = Number(targetPrice);
 
@@ -69,6 +74,7 @@ export async function POST(req: NextRequest) {
           throw new Error(`Insufficient purchasing power. Required collateral: $${requiredCash.toFixed(2)}`);
         }
 
+        // Double-Entry Ledger: Escrow Lock
         await recordJournalEntry(tx, {
           type: "ORDER_ESCROW",
           description: `Escrow lock for BUY ${parsedShares} ${symbol}`,
@@ -89,7 +95,15 @@ export async function POST(req: NextRequest) {
       }
 
       return await tx.order.create({
-        data: { userId, symbol, side, type, shares: parsedShares, targetPrice: parsedTarget, status: "PENDING" }
+        data: {
+          userId,
+          symbol,
+          side,
+          type,
+          shares: parsedShares,
+          targetPrice: parsedTarget,
+          status: "PENDING"
+        }
       });
     });
 
@@ -99,12 +113,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
-    const userId = await getUserId(req);
+    const userId = await getUserId();
     if (!userId) return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
 
-    const { searchParams } = req.nextUrl;
+    const { searchParams } = new URL(req.url);
     const orderId = searchParams.get("id");
 
     if (!orderId) return NextResponse.json({ error: "Order ID required" }, { status: 400 });
@@ -120,6 +134,8 @@ export async function DELETE(req: NextRequest) {
 
       if (order.side === "BUY") {
         const refundAmount = order.shares * order.targetPrice;
+        
+        // Double-Entry Ledger: Escrow Refund
         await recordJournalEntry(tx, {
           type: "ESCROW_REFUND",
           referenceId: order.id,
@@ -141,7 +157,12 @@ export async function DELETE(req: NextRequest) {
           });
         } else {
           await tx.position.create({
-            data: { userId, symbol: order.symbol, shares: order.shares, averagePrice: order.targetPrice }
+            data: {
+              userId,
+              symbol: order.symbol,
+              shares: order.shares,
+              averagePrice: order.targetPrice
+            }
           });
         }
       }

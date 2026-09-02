@@ -2,13 +2,37 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import * as jose from "jose";
 import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 
 export const dynamic = "force-dynamic";
 
 // ==========================================
+// DUAL-AUTH HELPER
+// ==========================================
+async function getUserId() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (dbUser) return String(dbUser.id);
+  }
+
+  const token = cookies().get("token")?.value;
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
+      const { payload } = await jose.jwtVerify(token, secret);
+      return payload.userId as string;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ==========================================
 // HELPER: Normalize Symbols & Fetch Live Price
 // ==========================================
-// Forces known cryptos to always append /USD
 function normalizeSymbol(rawSymbol: string): string {
   const symbol = rawSymbol.toUpperCase().trim();
   const cryptos = ["BTC", "ETH", "SOL", "AVAX", "BNB", "DOGE", "XRP", "ADA", "LINK"];
@@ -45,24 +69,9 @@ async function getLiveAssetPrice(rawSymbol: string): Promise<number> {
 // ==========================================
 export async function POST(req: Request) {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get("token")?.value;
-
-    if (!token) {
+    const userId = await getUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized", code: "AUTH_FAILED" }, { status: 401 });
-    }
-
-    let decoded: any;
-    try {
-      decoded = jose.decodeJwt(token);
-    } catch (e) {
-      return NextResponse.json({ error: "Invalid token format", code: "AUTH_FAILED" }, { status: 401 });
-    }
-
-    const userEmail = decoded?.email || decoded?.sub;
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "Corrupted token missing email", code: "AUTH_FAILED" }, { status: 401 });
     }
 
     const { action, symbol: rawSymbol, shares, currentPrice } = await req.json();
@@ -71,7 +80,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid trade parameters" }, { status: 400 });
     }
 
-    // Normalize the symbol here before any database lookups
     const symbol = normalizeSymbol(rawSymbol);
 
     let executionPrice = parseFloat(currentPrice);
@@ -82,7 +90,7 @@ export async function POST(req: Request) {
     const totalOrderValue = Number((shares * executionPrice).toFixed(2));
 
     await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { email: userEmail } });
+      const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) throw new Error("User not found");
 
       const existingPosition = await tx.position.findFirst({
@@ -144,7 +152,7 @@ export async function POST(req: Request) {
     });
 
     const updatedUser = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: { id: userId },
       include: { 
         positions: true, 
         trades: { orderBy: { createdAt: 'desc' }, take: 50 } 

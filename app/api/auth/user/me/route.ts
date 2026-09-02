@@ -1,15 +1,18 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
-import { getToken } from "next-auth/jwt";
+import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/nextauth";
 
-async function getUserId(req: NextRequest) {
-  // 1. NextAuth Token (Google)
-  const nextAuthToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (nextAuthToken?.userId) return nextAuthToken.userId as string;
+async function getUserId() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (dbUser) return String(dbUser.id);
+  }
 
-  // 2. Legacy Token (Custom)
-  const token = req.cookies.get("token")?.value;
+  const token = cookies().get("token")?.value;
   if (token) {
     try {
       const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
@@ -22,12 +25,12 @@ async function getUserId(req: NextRequest) {
   return null;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const userId = await getUserId(req);
+    const userId = await getUserId();
     
     if (!userId) {
-      return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
+      return NextResponse.json({ code: "AUTH_FAILED", error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -38,7 +41,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
+      return NextResponse.json({ code: "AUTH_FAILED", error: "Unauthorized" }, { status: 401 });
     }
 
     return NextResponse.json({ 

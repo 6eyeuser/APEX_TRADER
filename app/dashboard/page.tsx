@@ -90,11 +90,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const token = Cookies.get("token");
-    if (!token) {
-      router.push("/");
-      return;
-    }
+    // REMOVED client-side cookie checking here! Let the backend /api/auth/user/me route verify you instead.
+    
     loadRealUserDatabase();
     if (initializeMarketData) initializeMarketData();
 
@@ -438,7 +435,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* REPLACED: Unified Trade & Blockchain History */}
+        {/* Unified Trade & Blockchain History */}
         <UnifiedTradeHistory />
 
       </main>

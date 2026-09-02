@@ -2,10 +2,35 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import * as jose from "jose";
 import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 
 export const dynamic = "force-dynamic";
 
 const CRYPTO_LIST = new Set(["BTC", "ETH", "SOL", "AVAX", "BNB", "DOGE", "XRP", "ADA", "LINK", "MATIC", "DOT", "NEAR"]);
+
+// ==========================================
+// DUAL-AUTH HELPER
+// ==========================================
+async function getUserId() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (dbUser) return String(dbUser.id);
+  }
+
+  const token = cookies().get("token")?.value;
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
+      const { payload } = await jose.jwtVerify(token, secret);
+      return payload.userId as string;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
 
 // ==========================================
 // 1. Symbol Sanitization & Market Hours
@@ -195,19 +220,11 @@ async function executeOrder(userId: string, action: "BUY" | "SELL", rawSymbol: s
 // ==========================================
 export async function POST(req: Request) {
   try {
-    const token = cookies().get("token")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await getUserId();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    let decoded: any;
-    try {
-      decoded = jose.decodeJwt(token);
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const userEmail = decoded?.email || decoded?.sub;
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: { id: userId },
       include: { positions: true }
     });
 
