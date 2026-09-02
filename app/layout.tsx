@@ -1,11 +1,31 @@
 import type { Metadata } from "next";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 // @ts-ignore
 import "./globals.css";
-import { Providers } from "./providers";
+import Providers from "./providers";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-space-grotesk",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-inter",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
-  title: "ApexTrader - Institutional Grade Tools",
-  description: "Experience lightning-fast execution, advanced charting, and real-time market data in one unified terminal.",
+  title: "ApexTrader — Institutional-grade demo trading terminal",
+  description:
+    "Trade stocks, forex, and crypto on a web terminal built with institutional-terminal execution mechanics. Simulated funds, real mechanics.",
 };
 
 export default function RootLayout({
@@ -14,9 +34,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      {/* Set the default dark background to match your login UI */}
-      <body className="bg-[#0B0E14] text-white antialiased">
+    <html
+      lang="en"
+      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+    >
+      <body className="bg-[#0B0E14] text-white antialiased font-body">
         <Providers>
           {children}
         </Providers>
