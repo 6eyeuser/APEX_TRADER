@@ -1,18 +1,40 @@
 import { NextResponse } from "next/server";
 import * as jose from "jose";
 import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+// DUAL-AUTH HELPER
+async function getUserId() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (dbUser) return String(dbUser.id);
+  }
+
+  const token = cookies().get("token")?.value;
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
+      const { payload } = await jose.jwtVerify(token, secret);
+      return payload.userId as string;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
-    const token = cookies().get("token")?.value;
-    if (!token) {
+    // 1. Verify User using Dual-Auth
+    const userId = await getUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
-    await jose.jwtVerify(token, secret);
     
     const formData = await req.formData();
     const audioFile = formData.get("audio") as Blob;
@@ -24,7 +46,7 @@ export async function POST(req: Request) {
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 1. Deepgram Transcription
+    // 2. Deepgram Transcription
     const dgResponse = await fetch("https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true", {
       method: "POST",
       headers: {
@@ -45,7 +67,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No speech detected. Please speak clearly into the microphone." }, { status: 400 });
     }
 
-    // 2. Groq Intent Extraction (Free Alternative to OpenAI)
+    // 3. Groq Intent Extraction
     const llmPrompt = `
       You are an automated stock trading assistant. Extract the trade intent from this transcript:
       Transcript: "${transcript}"
