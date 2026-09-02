@@ -1,68 +1,54 @@
-import { NextResponse } from "next/server";
-import { prisma } from "../../../../../lib/prisma";
+import { NextResponse, NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
-import { cookies } from "next/headers";
+import { getToken } from "next-auth/jwt";
 
-export const dynamic = "force-dynamic";
+async function getUserId(req: NextRequest) {
+  // 1. NextAuth Token (Google)
+  const nextAuthToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (nextAuthToken?.userId) return nextAuthToken.userId as string;
 
-export async function GET() {
-  try {
-    const cookieStore = cookies();
-    const token = cookieStore.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized", code: "AUTH_FAILED" }, { status: 401 });
-    }
-
-    let decoded: any;
+  // 2. Legacy Token (Custom)
+  const token = req.cookies.get("token")?.value;
+  if (token) {
     try {
-      decoded = jose.decodeJwt(token);
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "apex_trader_super_secret_key_2026");
+      const { payload } = await jose.jwtVerify(token, secret);
+      return payload.userId as string;
     } catch (e) {
-      return NextResponse.json({ error: "Invalid token format", code: "AUTH_FAILED" }, { status: 401 });
+      return null;
     }
+  }
+  return null;
+}
 
-    const userEmail = decoded?.email || decoded?.sub;
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "Corrupted token missing email", code: "AUTH_FAILED" }, { status: 401 });
+export async function GET(req: NextRequest) {
+  try {
+    const userId = await getUserId(req);
+    
+    if (!userId) {
+      return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { 
+      where: { id: userId },
+      include: {
         positions: true,
-        trades: { 
-          orderBy: { createdAt: 'desc' },
-          take: 50 
-        }
       }
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found", code: "AUTH_FAILED" }, { status: 404 });
+      return NextResponse.json({ code: "AUTH_FAILED" }, { status: 401 });
     }
 
-    // Format trades for the frontend
-    const formattedTrades = user.trades.map(trade => ({
-      id: trade.id,
-      timestamp: new Date(trade.createdAt).getTime(),
-      symbol: trade.symbol,
-      action: trade.action,
-      shares: trade.shares,
-      price: trade.price,
-      total: trade.total
-    }));
-
-    return NextResponse.json({
-      success: true,
-      name: user.name,
-      balance: user.balance,
+    return NextResponse.json({ 
+      success: true, 
+      balance: user.balance, 
       positions: user.positions,
-      tradeHistory: formattedTrades // Sent to frontend correctly
+      name: user.name,
+      email: user.email
     });
-
-  } catch (error) {
-    console.error("Profile Fetch Error:", error);
-    return NextResponse.json({ error: "Database error", code: "AUTH_FAILED" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

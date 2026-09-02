@@ -1,52 +1,38 @@
-
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { useSession, signIn, signOut } from "next-auth/react";
 import Cookies from "js-cookie";
-import { decodeJwt } from "jose";
 import { ChevronDown, LayoutDashboard, Settings, HelpCircle, LogOut, Wallet } from "lucide-react";
 
 export default function Nav() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("Trader");
+  // Use NextAuth hook instead of manually decoding cookies
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === "authenticated";
+  const userName = session?.user?.name || "Trader";
+  
   const [menuOpen, setMenuOpen] = useState(false);
 
-  
-  useEffect(() => {
-    const token = Cookies.get("token");
-    if (token) {
-      try {
-        const decoded = decodeJwt(token);
-        if (decoded && decoded.name) {
-          setUserName(decoded.name as string);
-        }
-        setIsLoggedIn(true);
-      } catch (e) {
-        setIsLoggedIn(false);
-      }
-    } else {
-      setIsLoggedIn(false);
-    }
-  }, []);
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Clean up legacy cookies just in case
     Cookies.remove("token");
-    setIsLoggedIn(false);
     setMenuOpen(false);
+    // Use official NextAuth signout
+    await signOut({ callbackUrl: "/" });
   };
 
   return (
     <header className="sticky top-0 z-40 bg-[#0B0E14]/85 backdrop-blur-md border-b border-[#1E222D]">
       <div className="max-w-6xl mx-auto flex items-center justify-between px-5 sm:px-8 py-4">
         
-        {}
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#00C853]" />
           <span className="font-bold text-lg tracking-tight text-white">ApexTrader</span>
         </Link>
         
-        {}
+        {/* Auth / Menu */}
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <div className="relative">
@@ -61,7 +47,7 @@ export default function Nav() {
                 <ChevronDown size={14} className="text-[#7C8699]" />
               </button>
 
-              {}
+              {/* Dropdown Menu */}
               {menuOpen && (
                 <div 
                   className="absolute right-0 mt-2 w-52 bg-[#131722] border border-[#1E222D] rounded-xl shadow-2xl py-2 z-50"
@@ -120,18 +106,19 @@ export default function Nav() {
             </div>
           ) : (
             <div className="flex items-center gap-4">
-              <Link 
-                href="/login" 
+              {/* Force Google Login directly on click */}
+              <button 
+                onClick={() => signIn("google", { callbackUrl: "/terminal" })}
                 className="hidden sm:block text-sm font-medium text-[#7C8699] hover:text-white transition-colors"
               >
                 Log in
-              </Link>
-              <Link
-                href="/signup"
+              </button>
+              <button
+                onClick={() => signIn("google", { callbackUrl: "/terminal" })}
                 className="text-sm font-bold rounded-lg px-4 py-2 bg-[#00C853] text-[#052012] transition-all hover:bg-[#00E676] shadow-[0_0_15px_rgba(0,200,83,0.2)] hover:shadow-[0_0_25px_rgba(0,200,83,0.4)]"
               >
                 Create Free Account
-              </Link>
+              </button>
             </div>
           )}
         </div>

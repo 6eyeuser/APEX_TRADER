@@ -93,16 +93,8 @@ export default function TerminalPage() {
 
   // Auth & Initial Data Fetching
   useEffect(() => {
-    // CRITICAL FIX: Check for both custom token AND NextAuth Google session cookies
-    const hasCustomToken = Cookies.get("token");
-    const hasNextAuthToken = Cookies.get("next-auth.session-token");
-    const hasSecureNextAuthToken = Cookies.get("__Secure-next-auth.session-token");
-    
-    // If NO tokens exist, kick to login
-    if (!hasCustomToken && !hasNextAuthToken && !hasSecureNextAuthToken) {
-      router.push("/");
-      return;
-    }
+    // We NO LONGER check cookies manually here. NextAuth cookies are HttpOnly and invisible to the browser.
+    // Middleware already protects this route. We simply fetch the user data.
 
     const loadRealUserDatabase = async () => {
       try {
@@ -117,6 +109,7 @@ export default function TerminalPage() {
         
         const data = await res.json();
         
+        // Only redirect if the BACKEND specifically says we are unauthorized
         if (data.code === "AUTH_FAILED") {
           Cookies.remove("token", { path: "/" });
           router.push("/");
@@ -368,11 +361,10 @@ export default function TerminalPage() {
 
                 <button
                   onClick={() => {
-                    // Sign out needs to clear BOTH tokens now
+                    // Clear custom legacy token just in case
                     Cookies.remove("token", { path: "/" });
-                    Cookies.remove("next-auth.session-token", { path: "/" });
-                    Cookies.remove("__Secure-next-auth.session-token", { path: "/" });
-                    router.push("/");
+                    // Hit NextAuth's native signout route to clear secure HttpOnly cookies
+                    window.location.href = "/api/auth/signout?callbackUrl=/";
                   }}
                   className="w-full px-4 py-2.5 text-left text-sm text-[#FF3B30] hover:bg-[#FF3B30]/10 flex items-center gap-3 transition"
                 >
