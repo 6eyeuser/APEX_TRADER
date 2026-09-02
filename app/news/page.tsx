@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
@@ -57,7 +56,7 @@ function NewsContent() {
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-white p-6 md:p-12 font-sans">
-      {}
+      {/* Header */}
       <div className="max-w-7xl mx-auto mb-8 flex items-center justify-between border-b border-[#1E222D] pb-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -77,7 +76,7 @@ function NewsContent() {
 
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {}
+        {/* Featured / Selected Story */}
         {headlineParam && (
           <div className="bg-[#131722] border border-[#2962FF]/40 rounded-2xl p-6 md:p-8 relative shadow-[0_0_30px_rgba(41,98,255,0.1)]">
             
@@ -98,7 +97,7 @@ function NewsContent() {
               </Link>
             </div>
             
-            {}
+            {/* Added text-white for visibility */}
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-snug">
               {headlineParam}
             </h2>
@@ -109,7 +108,7 @@ function NewsContent() {
               </p>
             )}
             
-            {}
+            {/* Added Read Article Button */}
             {urlParam ? (
               <a 
                 href={urlParam}
@@ -125,7 +124,7 @@ function NewsContent() {
           </div>
         )}
 
-        {}
+        {/* Loading Spinner */}
         {isLoading && (
           <div className="flex flex-col items-center justify-center h-48 gap-3">
             <div className="w-8 h-8 border-4 border-[#1E222D] border-t-[#2962FF] rounded-full animate-spin" />
@@ -133,7 +132,7 @@ function NewsContent() {
           </div>
         )}
 
-        {}
+        {/* Error Notification */}
         {error && !isLoading && (
           <div className="flex items-center gap-3 bg-[#FF3B30]/10 border border-[#FF3B30]/40 text-[#FF3B30] p-4 rounded-xl text-sm">
             <AlertCircle size={20} />
@@ -141,7 +140,7 @@ function NewsContent() {
           </div>
         )}
 
-        {}
+        {/* Articles Feed Grid */}
         {!isLoading && articles.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {articles.map((article) => (
@@ -176,12 +175,12 @@ function NewsContent() {
                     </div>
                   )}
                   
-                  {}
+                  {/* Fixed Header Contrast */}
                   <h3 className="font-bold text-lg text-white mb-2 group-hover:text-[#2962FF] transition-colors line-clamp-2">
                     {article.headline}
                   </h3>
 
-                  {}
+                  {/* Fixed Paragraph Contrast */}
                   <p className="text-gray-400 text-sm leading-relaxed mb-4 line-clamp-3 flex-grow">
                     {article.summary}
                   </p>

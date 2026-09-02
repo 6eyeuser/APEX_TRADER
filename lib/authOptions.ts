@@ -2,6 +2,7 @@ import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
+import crypto from "crypto";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -25,13 +26,11 @@ export const authOptions: NextAuthOptions = {
       console.log("Email:", user.email);
       console.log("=================================");
 
-      // Only allow Google
       if (account?.provider !== "google") {
         console.error("Google sign-in rejected: invalid provider");
         return false;
       }
 
-      // Google must provide an email
       if (!user.email) {
         console.error("Google sign-in rejected: no email");
         return false;
@@ -40,23 +39,12 @@ export const authOptions: NextAuthOptions = {
       try {
         const email = user.email.toLowerCase().trim();
 
-        // -----------------------------------------
-        // FIND USER
-        // -----------------------------------------
-
         let dbUser = await prisma.user.findUnique({
-          where: {
-            email,
-          },
+          where: { email },
         });
-
-        // -----------------------------------------
-        // CREATE USER IF NOT FOUND
-        // -----------------------------------------
 
         if (!dbUser) {
           console.log("User not found. Creating new user...");
-
           dbUser = await prisma.user.create({
             data: {
               name: user.name || "Google Trader",
@@ -65,27 +53,18 @@ export const authOptions: NextAuthOptions = {
               balance: 100000,
             },
           });
-
           console.log("Created Google user:", dbUser.id);
         } else {
           console.log("Existing user:", dbUser.id);
         }
 
-        // -----------------------------------------
-        // JWT SECRET
-        // -----------------------------------------
+        // CRITICAL FIX: Explicitly assign database ID to NextAuth user object
+        user.id = String(dbUser.id);
 
         const jwtSecret = process.env.JWT_SECRET;
-
         if (!jwtSecret) {
-          throw new Error(
-            "JWT_SECRET is missing from environment variables"
-          );
+          throw new Error("JWT_SECRET is missing from environment variables");
         }
-
-        // -----------------------------------------
-        // CREATE APEXTRADER JWT
-        // -----------------------------------------
 
         const secret = new TextEncoder().encode(jwtSecret);
 
@@ -94,14 +73,12 @@ export const authOptions: NextAuthOptions = {
           email: dbUser.email,
           name: dbUser.name,
         })
-          .setProtectedHeader({
-            alg: "HS256",
-          })
+          .setProtectedHeader({ alg: "HS256" })
           .setIssuedAt()
           .setExpirationTime("7d")
           .sign(secret);
 
-        // Store ApexTrader token on NextAuth user
+        // Store ApexToken on NextAuth user
         user.apexToken = apexToken;
 
         console.log("=================================");
@@ -117,18 +94,12 @@ export const authOptions: NextAuthOptions = {
         console.error("GOOGLE SIGN-IN FAILED");
         console.error(error);
         console.error("=================================");
-
-        // DO NOT silently convert the real error
-        // into a useless AccessDenied message.
         throw error;
       }
     },
 
-    // -----------------------------------------
-    // NEXTAUTH JWT
-    // -----------------------------------------
-
     async jwt({ token, user }) {
+      // user object is only available on the initial sign-in
       if (user?.id) {
         token.userId = String(user.id);
       }
@@ -139,10 +110,6 @@ export const authOptions: NextAuthOptions = {
 
       return token;
     },
-
-    // -----------------------------------------
-    // NEXTAUTH SESSION
-    // -----------------------------------------
 
     async session({ session, token }) {
       if (session.user) {

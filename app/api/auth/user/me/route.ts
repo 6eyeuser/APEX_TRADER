@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import * as jose from "jose";
@@ -43,7 +42,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not found", code: "AUTH_FAILED" }, { status: 404 });
     }
 
-    
+    // Format trades for the frontend
     const formattedTrades = user.trades.map(trade => ({
       id: trade.id,
       timestamp: new Date(trade.createdAt).getTime(),
@@ -59,7 +58,7 @@ export async function GET() {
       name: user.name,
       balance: user.balance,
       positions: user.positions,
-      tradeHistory: formattedTrades 
+      tradeHistory: formattedTrades // Sent to frontend correctly
     });
 
   } catch (error) {

@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
           throw new Error(`Insufficient purchasing power. Required collateral: $${requiredCash.toFixed(2)}`);
         }
 
-        
+        // Double-Entry Ledger: Escrow Lock
         await recordJournalEntry(tx, {
           type: "ORDER_ESCROW",
           description: `Escrow lock for BUY ${parsedShares} ${symbol}`,
@@ -119,7 +118,7 @@ export async function DELETE(req: Request) {
       if (order.side === "BUY") {
         const refundAmount = order.shares * order.targetPrice;
         
-        
+        // Double-Entry Ledger: Escrow Refund
         await recordJournalEntry(tx, {
           type: "ESCROW_REFUND",
           referenceId: order.id,

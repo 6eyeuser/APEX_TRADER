@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as jose from "jose";
@@ -22,7 +21,6 @@ export async function POST() {
 
     const userEmail = decoded?.email || decoded?.sub;
     
-    
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const user = await prisma.user.findUnique({ where: { email: userEmail } });
@@ -30,7 +28,6 @@ export async function POST() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    
     await (prisma.user as any).update({
       where: { email: userEmail },
       data: { telegramLinkCode: code }
