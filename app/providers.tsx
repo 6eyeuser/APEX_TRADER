@@ -4,7 +4,7 @@ import React from "react";
 import { SessionProvider } from "next-auth/react";
 import { Web3Provider } from "@/components/Web3Provider";
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Web3Provider>
       <SessionProvider>
@@ -13,3 +13,5 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     </Web3Provider>
   );
 }
+
+export default Providers;

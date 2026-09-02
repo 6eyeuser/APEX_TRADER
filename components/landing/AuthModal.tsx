@@ -1,11 +1,10 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Loader2 } from "lucide-react";
-import Cookies from "js-cookie"; 
+import Cookies from "js-cookie"; // <-- WE IMPORT COOKIES HERE
 
 interface AuthModalProps {
   open: boolean;
@@ -59,13 +58,13 @@ export default function AuthModal({
         throw new Error(data.error || "Authentication failed");
       }
 
-      
-      
+      // FIX: Check if your backend actually returned a token.
+      // If it did, set it in the browser cookies right here.
       if (data.token) {
         Cookies.set("token", data.token, { path: "/" });
       } else {
-        
-        
+        // FALLBACK: If your backend isn't returning a JWT token yet, we will fake it 
+        // using the name they just typed in, so the terminal doesn't crash!
         const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
         const mockPayload = btoa(JSON.stringify({ name: mode === "signup" ? name : "Trader" }));
         const mockJwt = `${header}.${mockPayload}.mock_signature`;
@@ -100,7 +99,7 @@ export default function AuthModal({
             transition={{ duration: 0.2 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {}
+            {/* Header with Mode Switcher */}
             <div className="flex items-center justify-between mb-5">
               <div className="flex gap-4">
                 <button
@@ -137,14 +136,14 @@ export default function AuthModal({
               </button>
             </div>
 
-            {}
+            {/* Error Banner */}
             {error && (
               <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-2.5 text-xs text-red-400">
                 {error}
               </div>
             )}
 
-            {}
+            {/* Authentication Form */}
             <form onSubmit={handleSubmit} className="space-y-3">
               {mode === "signup" && (
                 <div>

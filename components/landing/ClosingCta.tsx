@@ -1,4 +1,3 @@
-// components/landing/ClosingCta.tsx
 "use client";
 
 import React from "react";

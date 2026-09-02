@@ -1,4 +1,3 @@
-// app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -18,12 +17,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // NEW CHECK: Prevent error if a Google user tries to log in with a password
     if (!user.password) {
       return NextResponse.json({ error: "Please log in using your Google account." }, { status: 401 });
     }
 
-    // TypeScript is now happy because it knows user.password is definitely a string
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

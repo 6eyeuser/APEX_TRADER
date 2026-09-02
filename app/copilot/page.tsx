@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -10,14 +9,14 @@ export default function CopilotPage() {
 
   return (
     <div className="h-screen w-screen bg-black text-white flex flex-col overflow-hidden relative font-sans">
-      {}
+      {/* Deep Immersive Background Elements */}
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#131722] via-[#050505] to-black" />
       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#2962FF]/50 to-transparent z-10" />
       
-      {}
+      {/* Animated Grid overlay */}
       <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#1E222D_1px,transparent_1px),linear-gradient(to_bottom,#1E222D_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-20 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_80%,transparent_100%)]" />
 
-      {}
+      {/* Minimalist Tech Header */}
       <header className="h-14 bg-black/40 backdrop-blur-md border-b border-[#1E222D]/80 px-6 flex items-center justify-between shrink-0 z-20 relative shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-5">
           <button
@@ -42,9 +41,9 @@ export default function CopilotPage() {
         </div>
       </header>
 
-      {}
+      {/* Full Screen Edge-to-Edge Content Area */}
       <main className="flex-1 w-full h-full z-10 flex flex-col relative">
-        {}
+        {/* We pass fullScreen={true} which triggers the borderless UI in CopilotCard */}
         <CopilotCard fullScreen={true} />
       </main>
     </div>
