@@ -47,7 +47,8 @@ export default function TelegramPage() {
       
       if (data.code) {
         // 2. Open Telegram directly with the code in the start parameter (Zero manual input!)
-        window.open(`https://t.me/ApexTrader_Trading_bot?start=${data.code}`, "_blank");
+        // FIX: Pointing to the correct bot handle @ApexTrade_assistant_bot
+        window.open(`https://t.me/ApexTrade_assistant_bot?start=${data.code}`, "_blank");
       } else if (data.error) {
         alert(data.error);
       }
