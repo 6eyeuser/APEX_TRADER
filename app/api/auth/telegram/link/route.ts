@@ -325,10 +325,10 @@ export async function POST(req: Request) {
           return NextResponse.json({ success: true });
         }
 
-        // Unlink any previous account paired to this chat ID
+       // Unlink any previous account paired to this chat ID
         await prisma.user.updateMany({
           where: { telegramChatId: chatId },
-          data: { telegramChatId: null, telegramUsername: null },
+          data: { telegramChatId: null },
         });
 
         // Link the authenticated account
@@ -336,7 +336,6 @@ export async function POST(req: Request) {
           where: { id: userToLink.id },
           data: {
             telegramChatId: chatId,
-            telegramUsername: telegramUser,
             telegramLinkCode: null,
           },
         });
