@@ -1,4 +1,3 @@
-// components/UnifiedTradeHistory.tsx
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -27,7 +26,22 @@ interface SavedWallet {
 
 export default function UnifiedTradeHistory() {
   const { address: activeAddress, isConnected } = useAccount();
-  const dbTrades = useTradingStore((state) => state.tradeHistory) as TradeRecord[];
+  
+  // FIXED: Safely grab trades from either property name and normalize timestamps
+  const rawDbTrades = useTradingStore((state: any) => state.tradeHistory || state.trades) || [];
+  
+  const dbTrades: TradeRecord[] = useMemo(() => {
+    return rawDbTrades.map((t: any) => ({
+      id: t.id,
+      timestamp: t.createdAt ? new Date(t.createdAt).getTime() : Date.now(),
+      symbol: t.symbol,
+      action: t.action,
+      shares: t.shares,
+      price: t.price,
+      total: t.total,
+      isWeb3: false,
+    }));
+  }, [rawDbTrades]);
   
   const [web3Trades, setWeb3Trades] = useState<TradeRecord[]>([]);
   const [isLoadingWeb3, setIsLoadingWeb3] = useState(false);
@@ -69,7 +83,6 @@ export default function UnifiedTradeHistory() {
       setIsLoadingWeb3(true);
       try {
         const query = targetAddresses.join(",");
-        // FIXED ROUTE: pointing directly to /api/wallet/history
         const res = await fetch(`/api/wallet/history?addresses=${query}`);
         const data = await res.json();
         if (data.success && Array.isArray(data.transactions)) {
@@ -147,8 +160,8 @@ export default function UnifiedTradeHistory() {
                 </td>
               </tr>
             ) : (
-              unifiedLedger.map((trade) => (
-                <tr key={trade.id} className="hover:bg-[#1A1E29]/30 transition-colors group">
+              unifiedLedger.map((trade, idx) => (
+                <tr key={`${trade.id}-${idx}`} className="hover:bg-[#1A1E29]/30 transition-colors group">
                   
                   {/* Action Column */}
                   <td className="px-6 py-4 whitespace-nowrap">

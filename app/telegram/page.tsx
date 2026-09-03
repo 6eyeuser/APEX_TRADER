@@ -38,6 +38,11 @@ export default function TelegramPage() {
   const connectTelegram = async () => {
     try {
       setIsLoading(true);
+      
+      // AUTOMATION: Silently ping the webhook setup route in the background 
+      // so the bot URL is always active without manual browser intervention.
+      await fetch("/api/auth/webhook").catch(console.error);
+
       // 1. Generate one-time code behind the scenes
       const res = await fetch("/api/auth/telegram/link/generate-code", {
         method: "POST",
@@ -47,7 +52,6 @@ export default function TelegramPage() {
       
       if (data.code) {
         // 2. Open Telegram directly with the code in the start parameter (Zero manual input!)
-        // FIX: Pointing to the correct bot handle @ApexTrade_assistant_bot
         window.open(`https://t.me/ApexTrade_assistant_bot?start=${data.code}`, "_blank");
       } else if (data.error) {
         alert(data.error);
