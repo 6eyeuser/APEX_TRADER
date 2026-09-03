@@ -1,3 +1,4 @@
+// components/UnifiedTradeHistory.tsx
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -25,9 +26,9 @@ interface SavedWallet {
 }
 
 export default function UnifiedTradeHistory() {
-  const { address: activeAddress, isConnected } = useAccount();
+  const { address: activeAddress, isConnected, connector } = useAccount();
   
-  // FIXED: Safely grab trades from either property name and normalize timestamps
+  // Safely grab trades from either property name and normalize timestamps
   const rawDbTrades = useTradingStore((state: any) => state.tradeHistory || state.trades) || [];
   
   const dbTrades: TradeRecord[] = useMemo(() => {
@@ -63,7 +64,7 @@ export default function UnifiedTradeHistory() {
     fetchDbWallets();
   }, []);
 
-  // Fetch on-chain history for MetaMask active session + all saved DB wallets
+  // Fetch on-chain history for active session + all saved DB wallets
   useEffect(() => {
     const addressSet = new Set<string>();
     if (isConnected && activeAddress) {
@@ -117,7 +118,9 @@ export default function UnifiedTradeHistory() {
   const getWalletDisplayName = (address?: string) => {
     if (!address) return "Web3 Wallet";
     if (activeAddress && address.toLowerCase() === activeAddress.toLowerCase()) {
-      return "MetaMask (Active)";
+      // DYNAMIC FIX: Uses connector.name (e.g. "Rainbow", "MetaMask") instead of hardcoded text
+      const walletName = connector?.name || "Web3 Wallet";
+      return `${walletName} (Active)`;
     }
     const matched = dbWallets.find((w) => w.address.toLowerCase() === address.toLowerCase());
     if (matched?.label) return matched.label;
@@ -134,7 +137,7 @@ export default function UnifiedTradeHistory() {
         {isLoadingWeb3 && (
           <div className="flex items-center gap-2 text-xs text-[#7C8699]">
             <Loader2 size={12} className="animate-spin text-[#2962FF]" />
-            Syncing MetaMask & Linked Wallets...
+            Syncing Wallet & Linked History...
           </div>
         )}
       </div>
@@ -204,7 +207,7 @@ export default function UnifiedTradeHistory() {
                           target="_blank" 
                           rel="noreferrer"
                           className="opacity-0 group-hover:opacity-100 transition-opacity text-[#7C8699] hover:text-[#2962FF]"
-                          title="View on Etherscan"
+                          title="View on Explorer"
                         >
                           <ExternalLink size={13} />
                         </a>

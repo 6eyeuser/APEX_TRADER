@@ -21,7 +21,7 @@ interface SavedWallet {
 export default function WalletPage() {
   const [isMounted, setIsMounted] = useState(false);
   
-  const { address, isConnected, chain } = useAccount();
+  const { address, isConnected, chain, connector } = useAccount();
   const { data: balanceData, refetch } = useBalance({ address });
   const { chains, switchChain } = useSwitchChain();
   
@@ -53,19 +53,28 @@ export default function WalletPage() {
     if (!address) return;
     setIsSaving(true);
     try {
-      await refetch();
-      await fetch("/api/wallet", {
+      const balanceRes = await refetch();
+      const currentBalance = parseFloat(balanceRes.data?.formatted || balanceData?.formatted || "0");
+      const currentSymbol = balanceRes.data?.symbol || balanceData?.symbol || "ETH";
+      const walletBrand = connector?.name || "Web3";
+
+      const res = await fetch("/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           address,
           chainId: chain?.id || 1,
           chainName: chain?.name || "Ethereum",
-          symbol: balanceData?.symbol || "ETH",
-          balance: parseFloat(balanceData?.formatted || "0"),
+          symbol: currentSymbol,
+          balance: currentBalance,
+          label: `${walletBrand} Wallet`,
         }),
       });
-      await fetchSavedWallets(false);
+      
+      const data = await res.json();
+      if (data.success) {
+        await fetchSavedWallets(false);
+      }
     } catch (err) {
       console.error("Save failed:", err);
     } finally {
@@ -121,7 +130,7 @@ export default function WalletPage() {
           {isMounted && isConnected && address && (
             <div className="mt-6 flex flex-col md:flex-row items-start md:items-center justify-between bg-[#1A1E29] p-4 rounded-xl gap-4 border border-[#2A2E39]">
               <div>
-                <p className="text-xs text-[#8B94A5] uppercase font-semibold">Active Session Wallet</p>
+                <p className="text-xs text-[#8B94A5] uppercase font-semibold">Active Session Wallet ({connector?.name || "Web3"})</p>
                 <p className="font-mono text-sm text-white">{address}</p>
                 <p className="text-xs text-[#2962FF] font-medium mt-1">
                   Network: {chain?.name || "Ethereum"} | Balance: {parseFloat(balanceData?.formatted || "0").toFixed(4)} {balanceData?.symbol}
@@ -202,7 +211,7 @@ export default function WalletPage() {
           )}
         </div>
 
-        {/* NEW: Unified Blockchain and Trade History */}
+        {/* Unified Blockchain and Trade History */}
         <UnifiedTradeHistory />
 
       </div>
