@@ -33,10 +33,14 @@ export async function GET() {
       return NextResponse.json({ code: "AUTH_FAILED", error: "Unauthorized" }, { status: 401 });
     }
 
+    // FIX: Added 'trades' to the database query
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         positions: true,
+        trades: {
+          orderBy: { createdAt: 'desc' } // This ensures your newest trades show at the top of the ledger
+        }
       }
     });
 
@@ -44,10 +48,12 @@ export async function GET() {
       return NextResponse.json({ code: "AUTH_FAILED", error: "Unauthorized" }, { status: 401 });
     }
 
+    // FIX: Added 'trades' to the data being sent to the frontend
     return NextResponse.json({ 
       success: true, 
       balance: user.balance, 
       positions: user.positions,
+      trades: user.trades,
       name: user.name,
       email: user.email
     });
