@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -53,19 +52,16 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
   const ticks = useTradingStore((state) => state.ticks);
   const activeTick = ticks[activeSymbol];
 
-  
   const [logicalPattern, setLogicalPattern] = useState<LogicalPattern | null>(null);
   const [boxCoords, setBoxCoords] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
-  
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null>(null);
   const [selectionCurrent, setSelectionCurrent] = useState<{ x: number, y: number } | null>(null);
 
   const [legend, setLegend] = useState<{ open: number; high: number; low: number; close: number; change: number; } | null>(null);
 
-  
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -111,7 +107,6 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
     };
   }, []);
 
-  
   useEffect(() => {
     if (!chartRef.current) return;
     try {
@@ -151,10 +146,6 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
     }
   }, [activeTick?.price, chartType]);
 
-
-  
-  
-  
   const updateOverlayPosition = useCallback(() => {
     if (!chartRef.current || !seriesRef.current || !logicalPattern) {
       setBoxCoords(null);
@@ -182,16 +173,9 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
 
   useEffect(() => { updateOverlayPosition(); }, [activeTick?.price, chartType, updateOverlayPosition, logicalPattern]);
 
-
-  
-  
-  
-  
-  
   const toggleSelectionMode = () => {
     const newMode = !isSelectionMode;
     setIsSelectionMode(newMode);
-    
     
     chartRef.current?.applyOptions({
       handleScroll: !newMode,
@@ -204,7 +188,6 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
     }
   };
 
-  
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isSelectionMode || !chartWrapperRef.current) return;
     const rect = chartWrapperRef.current.getBoundingClientRect();
@@ -224,16 +207,13 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
   const handleMouseUp = async () => {
     if (!isSelectionMode || !selectionStart || !selectionCurrent || !chartRef.current) return;
 
-    
     const minX = Math.min(selectionStart.x, selectionCurrent.x);
     const maxX = Math.max(selectionStart.x, selectionCurrent.x);
 
-    
     const timeScale = chartRef.current.timeScale();
     const startTime = timeScale.coordinateToTime(minX as any);
     const endTime = timeScale.coordinateToTime(maxX as any);
 
-    
     setSelectionStart(null);
     setSelectionCurrent(null);
     setIsSelectionMode(false);
@@ -241,23 +221,23 @@ export default function TradingChart({ chartType = 'candle', symbol }: TradingCh
 
     if (!startTime || !endTime) return;
 
-    
-
-const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Number(startTime) && Number(c.time) <= Number(endTime)) || [];
+    const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Number(startTime) && Number(c.time) <= Number(endTime)) || [];
     
     if (selectedCandles.length < 5) {
       alert("Selection too narrow. Please drag a wider box across more candles.");
       return;
     }
 
-    
     await runAnalysis(selectedCandles);
   };
 
   const runAnalysis = async (candlesToAnalyze: any[]) => {
     setIsScanning(true);
-   try {
-      const res = await fetch("http://127.0.0.1:8000/analyze", {
+    try {
+      // PRODUCTION FIX: Automatically points to Render in prod, localhost in dev.
+      const API_BASE_URL = process.env.NEXT_PUBLIC_CV_API_URL || "http://127.0.0.1:8000";
+      
+      const res = await fetch(`${API_BASE_URL}/api/analyze-ohlc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: activeSymbol, candles: candlesToAnalyze }),
@@ -271,16 +251,14 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to run analysis. Check Python backend.");
+      alert(`Failed to connect to Python backend at ${process.env.NEXT_PUBLIC_CV_API_URL || 'localhost'}.`);
     } finally {
       setIsScanning(false);
     }
   };
 
-
   const isUp = (activeTick?.change || 0) >= 0;
 
-  
   const getSelectionStyle = () => {
     if (!selectionStart || !selectionCurrent) return {};
     const left = Math.min(selectionStart.x, selectionCurrent.x);
@@ -292,7 +270,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
 
   return (
     <div className="flex-1 bg-[#131722] flex flex-col overflow-hidden relative min-h-[420px] w-full h-full">
-      {}
       <div className="h-10 border-b border-[#1E222D] flex items-center justify-between px-3 bg-[#1A1E29]/50 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 pr-3 border-r border-[#1E222D]">
@@ -314,7 +291,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
             </button>
           )}
 
-          {}
           <button
             onClick={toggleSelectionMode}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold transition-colors ${
@@ -333,7 +309,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
         </div>
       </div>
 
-      {}
       <div className="h-7 px-3 flex items-center gap-4 text-xs font-mono bg-[#131722] border-b border-[#1E222D]/40 text-[#7C8699] shrink-0 select-none z-20 relative">
         {legend ? (
           <>
@@ -345,7 +320,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
         ) : <span className="text-[11px]">Hover to view data</span>}
       </div>
 
-      {}
       <div 
         ref={chartWrapperRef} 
         className={`flex-1 w-full h-full relative overflow-hidden ${isSelectionMode ? "cursor-crosshair" : ""}`}
@@ -356,7 +330,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
       >
         <div ref={chartContainerRef} className={`absolute inset-0 [&_a]:!hidden ${isSelectionMode ? "pointer-events-none" : ""}`} />
 
-        {}
         {isSelectionMode && selectionStart && selectionCurrent && (
           <div 
             className="absolute border-2 border-[#2962FF] bg-[#2962FF]/20 pointer-events-none z-40 backdrop-blur-[1px]"
@@ -364,7 +337,6 @@ const selectedCandles = activeTick?.history?.filter(c => Number(c.time) >= Numbe
           />
         )}
 
-        {}
         {logicalPattern && boxCoords && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-30">
             <g>
