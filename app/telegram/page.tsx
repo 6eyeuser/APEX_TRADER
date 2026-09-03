@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import { 
   ArrowLeft, Send, CheckCircle2, Copy, Check, 
   ShieldCheck, BellRing, Zap, ExternalLink, RefreshCw 
@@ -48,6 +47,9 @@ export default function TelegramPage() {
       const data = await res.json();
       if (data.code) {
         setLinkCode(data.code);
+      } else if (data.error) {
+        console.error("Auth Error:", data.error);
+        alert(data.error);
       }
     } catch (err) {
       console.error("Failed to generate code:", err);
@@ -56,12 +58,9 @@ export default function TelegramPage() {
     }
   };
 
+  // PRODUCTION FIX: Removed the legacy 'Cookies.get("token")' check 
+  // that was causing the redirect loop.
   useEffect(() => {
-    const token = Cookies.get("token");
-    if (!token) {
-      router.push("/");
-      return;
-    }
     fetchTelegramStatus();
   }, []);
 
